@@ -22,32 +22,46 @@ volatile uint8_t pendingCommand = 0;
 
 // transforms input from RPi4 input to ascii values eg 1->49, 2->50 3->51... double check on expansion
 // Serial outputs are on 9600
-// TODO: expand to have the different dropoffs for the different colors
 void routine(uint8_t command) {
   switch (command) {
-    case 49:
+    case 49: // 1
       Serial.println("Running: PICKUP");
-      pickup();
+      pickup(20,0);
       break;
 
-    case 50:
+    case 50: // 2
       Serial.println("Running: DROPOFF");
-      dropoff(20,0);
+      dropoff(10,0);
       break;
 
-    case 51:
+    case 51: // 3
       Serial.println("Running: DELIVER ZONE 1");
       dropoff(10,-10);
       break;
 
-    case 52:
+    case 52: // 4
       Serial.println("Running: DELIVER ZONE 2");
       dropoff(5,20);
       break;
 
-    case 53:
+    case 53: // 5
       Serial.println("Running: DELIVER ZONE 3");
       dropoff(5,-20);
+      break;
+
+    case 54: // 6
+      Serial.println("Running: RETRIVE ZONE 1");
+      retrive(10,-10);
+      break;
+
+    case 55: // 7
+      Serial.println("Running: RETRIVE ZONE 2");
+      retrive(5,20);
+      break;
+    
+    case 56: // 8
+      Serial.println("Running: RETRIVE ZONE 3");
+      retrive(5,-20);
       break;
 
     default:
@@ -56,7 +70,7 @@ void routine(uint8_t command) {
   }
 }
 
-// BLE SERVER
+// BLE SERVER Callback for whenever data is received from the Pi
 class MyCallbacks : public BLECharacteristicCallbacks {
   void onWrite(BLECharacteristic *pCharacteristic) {
 
@@ -93,7 +107,7 @@ void setup() {
   
   Serial.begin(9600);
 
-  // BLE SERVER
+  // BLE SERVER initializes Server
   BLEDevice::init("ESP32_Server");
   BLEServer *pServer = BLEDevice::createServer();
   BLEService *pService = pServer->createService(SERVICE_UUID);
@@ -114,39 +128,30 @@ void setup() {
 }
 
 void coord_movement(int x, int y, int z) {
-  // Check range
-  // hypothesis ( x y z set in cm), coordinates based off the claw of the robot
   // uint8_t coordinate_set(float target_x,float target_y,float target_z,float pitch,float min_pitch,float max_pitch,uint32_t time);
   arm.coordinate_set(x,y,z,0,-90,180,1000);
   delay(2000);
 }
 
-void claw_op(bool isOpen) {
-  if (isOpen) {
-    // 
-    claw.set_angle(1, 0, 1000);
-  } else {
-    claw.set_angle(1, 180, 1000);
-  }
-  delay(2000);
-}
-
-void base_rotation(byte deg) {
-  // 0 - 180
-  base_swivel.set_angle(6, deg, 1000);
-  delay(2000);
-}
-
-void pickup() {
-  // pick up program
+void pickup(int x, int y) {
   // claw occasionally doesnt completely close or open, best guess is a faulty wire/connection
-  arm.coordinate_set(20,0,-6,0,-90,90,1000);
+  arm.coordinate_set(x,y,-6,0,-90,90,1000);
   delay(3000);
   claw.set_angle(1,180,100);
   delay(6000); // extra delay is to ensure that its able to grab the object
-  arm.coordinate_set(20,0,20,0,-90,90,1000);
+  arm.coordinate_set(x,y,20,0,-90,90,1000);
   delay(3000);
 }
+
+void pickup_from_sensor(int x, int y) {
+  arm.coordinate_set(x,y,0,0,-90,90,1000);
+  delay(3000);
+  claw.set_angle(1,180,100);
+  delay(6000); // extra delay is to ensure that its able to grab the object
+  arm.coordinate_set(x,y,20,0,-90,90,1000);
+  delay(3000);
+}
+
 void dropoff(int x, int y) {
   arm.coordinate_set(x,y,20,0,-90,90,1000);
   delay(3000);
@@ -158,6 +163,10 @@ void dropoff(int x, int y) {
   delay(3000);
 }
 
+void retrive(int x, int y) {
+  pickup(x,y);
+  dropoff(10,0);
+}
 
 void loop() {
 
@@ -169,17 +178,4 @@ void loop() {
   }
 
   delay(10); // Keeps BLE alive
-
-  //base_swivel.set_angle(6, deg, 1000);
 }
-/*
-BusServo_t claw;          // servo 1
-BusServo_t joint;         // servo 4
-BusServo_t claw_joint;    // servo 2
-BusServo_t claw_swivel;   // servo 3
-BusServo_t base;          // servo 5
-BusServo_t base_swivel;   // servo 6
-*/
-// robot arm drops down after powering down
-// no negatives on x,y,z in coordinate_set(x,y,z,0,-90,90,1000);
-// coordinate set better for delivery into specific space
