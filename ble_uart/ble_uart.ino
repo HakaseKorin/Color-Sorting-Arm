@@ -117,7 +117,7 @@ void loop() {
   }
   // connecting
   if (deviceConnected && !oldDeviceConnected) {
-    // do stuff here on connecting
+    // do stuff here on connecting to a new device
     oldDeviceConnected = true;
   }
 }
